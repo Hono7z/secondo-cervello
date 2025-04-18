@@ -1,48 +1,78 @@
-import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
-import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+// SCENA, CAMERA E RENDERER
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('#bg') });
+scene.background = new THREE.Color(0x000000);
 
-renderer.setPixelRatio(window.devicePixelRatio);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = 10;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-camera.position.z = 30;
+document.body.appendChild(renderer.domElement);
 
-// Glow effect
-const createNode = (color, label) => {
-  const geometry = new THREE.SphereGeometry(1.2, 32, 32);
-  const material = new THREE.MeshBasicMaterial({ color });
-  const sphere = new THREE.Mesh(geometry, material);
+// CONTROLLI DI NAVIGAZIONE (mouse)
+const controls = new OrbitControls(camera, renderer.domElement);
 
-  // Glow
-  const glowMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2 });
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(1.6, 32, 32), glowMaterial);
-  sphere.add(glow);
+// LUCE
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+scene.add(ambientLight);
 
-  return sphere;
-};
+// ARRAY DI NODI
+const nodes = [];
+const nodeGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+const nodeMaterial = new THREE.MeshStandardMaterial({ color: 0x44ccff });
 
-// Nodi simbolici
-const labels = ["Daimon", "Pensieri", "Filosofia", "Scienza", "Io Bambino", "Empatia"];
-const colors = ["#ffffff", "#ff69b4", "#87ceeb", "#32cd32", "#ffa500", "#ff4500"];
-
-labels.forEach((label, i) => {
-  const node = createNode(colors[i % colors.length], label);
+for (let i = 0; i < 10; i++) {
+  const node = new THREE.Mesh(nodeGeometry, nodeMaterial.clone());
   node.position.set(
-    Math.sin(i * 1.05) * 10,
-    Math.cos(i * 1.3) * 10,
-    Math.sin(i * 0.8) * 10
+    Math.random() * 10 - 5,
+    Math.random() * 10 - 5,
+    Math.random() * 10 - 5
   );
   scene.add(node);
-});
+  nodes.push(node);
+}
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
+// RAYCASTER PER INTERAZIONE
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let INTERSECTED = null;
 
+function onMouseMove(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+window.addEventListener('mousemove', onMouseMove, false);
+
+// ANIMAZIONE
 function animate() {
   requestAnimationFrame(animate);
+
+  // Raycasting per effetto "hover"
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(nodes);
+
+  nodes.forEach(node => {
+    node.material.emissive.setHex(0x000000); // reset glow
+    node.scale.set(1, 1, 1); // reset scala
+  });
+
+  if (intersects.length > 0) {
+    INTERSECTED = intersects[0].object;
+    INTERSECTED.material.emissive.setHex(0x4488ff); // effetto "glow"
+    INTERSECTED.scale.set(1.2, 1.2, 1.2); // effetto "zoom"
+  }
+
   controls.update();
   renderer.render(scene, camera);
 }
 animate();
+
+// ADATTAMENTO A RIDIMENSIONAMENTO FINESTRA
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
